@@ -1,5 +1,22 @@
 package ca.ualberta.ssrg.movies;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Type;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -16,6 +33,8 @@ import ca.ualberta.ssrg.movies.es.ESMovieManager;
 import ca.ualberta.ssrg.movies.es.Movie;
 import ca.ualberta.ssrg.movies.es.Movies;
 import ca.ualberta.ssrg.movies.es.MoviesController;
+import ca.ualberta.ssrg.movies.es.data.SearchResponse;
+import ca.ualberta.ssrg.movies.es.data.SimpleSearchCommand;
 
 public class MainActivity extends Activity {
 
@@ -75,7 +94,8 @@ public class MainActivity extends Activity {
 	protected void onResume() {
 		super.onResume();
 		
-		
+		Thread thread = new SearchThread();
+		thread.start();
 
 		// Refresh the list when visible
 		// TODO: Search all
@@ -132,6 +152,57 @@ public class MainActivity extends Activity {
 
 	class SearchThread extends Thread {
 		// TODO: Implement search thread
+		@Override
+		public void run() {
+			HttpClient client = new DefaultHttpClient();
+			HttpPost post = new HttpPost("http://cmput301.softwareprocess.es:8080/testing/movie/_search");
+			Gson gson = new Gson();
+			String string = gson.toJson(new SimpleSearchCommand(""));
+			
+			StringEntity stringEntity = null;
+			try {
+				stringEntity = new StringEntity(string);
+			} catch (UnsupportedEncodingException e) {
+				throw new RuntimeException(e);
+			}
+			
+			//tell server we expect JSon back
+			post.setHeader("Accept", "application/json");
+			post.setEntity(stringEntity);
+			
+			HttpResponse response;
+			
+			//try to execute HTTP query command
+			try {
+				response = client.execute(post);
+			} catch (ClientProtocolException e) {
+				throw new RuntimeException(e);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+			
+			Type searchResponseType = new TypeToken<SearchResponse<Movie>>() {
+			}.getType();
+			
+			//getting search response
+			try {
+				SearchResponse<Movie> result = gson.fromJson(
+						new InputStreamReader(
+								response.getEntity().getContent()
+								),
+						searchResponseType);
+			} catch (JsonIOException e) {
+				throw new RuntimeException(e);
+			} catch (JsonSyntaxException e) {
+				throw new RuntimeException(e);
+			} catch (IllegalStateException e) {
+				throw new RuntimeException(e);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+			
+			
+		}
 		
 	}
 
